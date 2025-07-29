@@ -101,6 +101,11 @@ beneficiary_idx ON JSON PREFIX 1 beneficiary: SCHEMA
 ## 📦 Running the Demo
 
 ```bash
+run jupyter notebook with file path Mobile Banking - Beneficiary List.ipynb
+```
+OR 
+
+```bash
 pip install redis
 python redis_beneficiary_demo.py
 ```
