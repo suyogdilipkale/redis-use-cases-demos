@@ -63,22 +63,6 @@ This repository demonstrates how Redis Enterprise can be used to solve advanced 
 
 ---
 
-## 📦 Project Structure
-
-redis-credit-vector/
-├── README.md
-├── requirements.txt
-├── notebooks/
-│ ├── 1_offer_semantic_search.ipynb
-│ ├── 2_fraud_detection_semantic.ipynb
-│ └── 3_support_query_semantic.ipynb
-└── redis_schema/
-├── index_creation.py
-├── stream_ingestion.py
-└── stream_consumer.py
-
----
-
 ## 🧪 Example Vector Schema
 
 ```json
