@@ -1,0 +1,259 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "be47d58a-e0c5-46c9-8a5c-3713c210a384",
+   "metadata": {},
+   "source": [
+    "📒 1. Personalized Offers Notebook"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "6a7526b7-2c5e-41ea-9ad0-f517807fd33f",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "Result{1 total, docs: [Document {'id': 'offer:001', 'payload': None, 'score': '0.244075298309', 'category': 'lifestyle'}]}"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import redis, numpy as np, json\n",
+    "from redis.commands.search.query import Query\n",
+    "\n",
+    "r = redis.Redis(host='redis-19205.c330.asia-south1-1.gce.redns.redis-cloud.com', port=19205,password='admin', decode_responses=True)\n",
+    "\n",
+    "from redis.commands.search.field import VectorField, TextField\n",
+    "from redis.commands.search.index_definition import IndexDefinition, IndexType\n",
+    "\n",
+    "schema = [\n",
+    "    TextField(\"$.category\", as_name=\"category\"),\n",
+    "    VectorField(\"$.embedding\", \"HNSW\", {\n",
+    "        \"TYPE\": \"FLOAT32\",\n",
+    "        \"DIM\": 384,\n",
+    "        \"DISTANCE_METRIC\": \"COSINE\"\n",
+    "    }, as_name=\"embedding\")\n",
+    "]\n",
+    "\n",
+    "r.ft(\"idx:offers\").create_index(schema, definition=IndexDefinition(prefix=[\"offer:\"], index_type=IndexType.JSON))\n",
+    "\n",
+    "# Add new offer\n",
+    "offer_id = \"offer:001\"\n",
+    "offer_data = {\n",
+    "    \"category\": \"lifestyle\",\n",
+    "    \"embedding\": list(np.random.rand(384))\n",
+    "}\n",
+    "r.execute_command(\"JSON.SET\", offer_id, \"$\", json.dumps(offer_data))\n",
+    "\n",
+    "# Semantic Search\n",
+    "query_vector = np.random.rand(384).astype(np.float32).tobytes()\n",
+    "q = Query(\"*=>[KNN 3 @embedding $vec AS score]\")\\\n",
+    "    .sort_by(\"score\").return_fields(\"category\", \"score\").dialect(2)\n",
+    "r.ft(\"idx:offers\").search(q, query_params={\"vec\": query_vector})\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ccbdd209-e234-44b2-bb4b-f3f648e0abfe",
+   "metadata": {},
+   "source": [
+    "📒 2. Fraud Detection Notebook"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "a243f77c-9391-4460-a41a-d01f9f0ebfe5",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Index did not exist or failed to drop: Unknown Index name\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "Result{0 total, docs: []}"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import redis, numpy as np, json\n",
+    "from redis.commands.search.query import Query\n",
+    "# Connect to Redis\n",
+    "r = redis.Redis(host='redis-19205.c330.asia-south1-1.gce.redns.redis-cloud.com', port=19205,password='admin', decode_responses=True)\n",
+    "\n",
+    "from redis.commands.search.field import VectorField, TextField, NumericField\n",
+    "from redis.commands.search.index_definition import IndexDefinition, IndexType\n",
+    "import redis\n",
+    "\n",
+    "\n",
+    "\n",
+    "# Define constants\n",
+    "INDEX_NAME = \"idx:txns\"\n",
+    "VECTOR_DIM = 128  # update based on your embedding size\n",
+    "\n",
+    "# Drop index if it exists (optional during dev)\n",
+    "try:\n",
+    "    r.ft(INDEX_NAME).dropindex(delete_documents=False)\n",
+    "except Exception as e:\n",
+    "    print(f\"Index did not exist or failed to drop: {e}\")\n",
+    "\n",
+    "# Define index schema\n",
+    "schema = (\n",
+    "    TextField(\"$.txn_id\", as_name=\"txn_id\"),\n",
+    "    NumericField(\"$.amount\", as_name=\"amount\"),\n",
+    "    VectorField(\"$.embedding\", \"FLAT\", {\n",
+    "        \"TYPE\": \"FLOAT32\",\n",
+    "        \"DIM\": VECTOR_DIM,\n",
+    "        \"DISTANCE_METRIC\": \"COSINE\",\n",
+    "        \"INITIAL_CAP\": 1000\n",
+    "    }, as_name=\"embedding\")\n",
+    ")\n",
+    "\n",
+    "# Define the index definition\n",
+    "definition = IndexDefinition(prefix=[\"txn:\"], index_type=IndexType.JSON)\n",
+    "\n",
+    "# Create the index\n",
+    "r.ft(INDEX_NAME).create_index(fields=schema, definition=definition)\n",
+    "\n",
+    "# Insert a transaction\n",
+    "txn_id = \"txn:9001\"\n",
+    "txn_data = {\n",
+    "    \"type\": \"POS\",\n",
+    "    \"amount\": 879.55,\n",
+    "    \"timestamp\": 1723456888,\n",
+    "    \"embedding\": list(np.random.rand(384))\n",
+    "}\n",
+    "r.execute_command(\"JSON.SET\", txn_id, \"$\", json.dumps(txn_data))\n",
+    "\n",
+    "# Query for similar transactions\n",
+    "query_vector = np.random.rand(384).astype(np.float32).tobytes()\n",
+    "q = Query(\"@type:{POS} => [KNN 5 @embedding $vec AS score]\")\\\n",
+    "    .sort_by(\"score\").return_fields(\"amount\", \"score\").dialect(2)\n",
+    "r.ft(\"idx:txns\").search(q, query_params={\"vec\": query_vector})\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "416d78f9-c144-4ad0-9726-1091216fb1ee",
+   "metadata": {},
+   "source": [
+    "📒 3. Customer Support Matching Notebook"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "b5257ddb-7319-4aa4-810d-d1e981e7e4de",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "Result{1 total, docs: [Document {'id': 'qna:01', 'payload': None, 'score': '0.22782510519', 'question': 'How to block my card?', 'answer': 'You can block it instantly via mobile app.'}]}"
+      ]
+     },
+     "execution_count": 14,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import redis, numpy as np, json\n",
+    "from redis.commands.search.query import Query\n",
+    "# Connect to Redis\n",
+    "r = redis.Redis(host='redis-19205.c330.asia-south1-1.gce.redns.redis-cloud.com', port=19205,password='admin', decode_responses=True)\n",
+    "\n",
+    "from redis.commands.search.field import VectorField, TextField, NumericField\n",
+    "from redis.commands.search.index_definition import IndexDefinition, IndexType\n",
+    "import redis\n",
+    "# Parameters\n",
+    "INDEX_NAME = \"idx:qna\"\n",
+    "VECTOR_DIM = 384  # or whatever dimension your vector has\n",
+    "\n",
+    "# Optional: Drop if it already exists\n",
+    "try:\n",
+    "    r.ft(INDEX_NAME).dropindex(delete_documents=False)\n",
+    "except:\n",
+    "    pass\n",
+    "\n",
+    "# Define the schema\n",
+    "schema = (\n",
+    "    TextField(\"$.question\", as_name=\"question\"),\n",
+    "    TextField(\"$.answer\", as_name=\"answer\"),\n",
+    "    VectorField(\"$.embedding\", \"FLAT\", {\n",
+    "        \"TYPE\": \"FLOAT32\",\n",
+    "        \"DIM\": VECTOR_DIM,\n",
+    "        \"DISTANCE_METRIC\": \"COSINE\",\n",
+    "        \"INITIAL_CAP\": 1000\n",
+    "    }, as_name=\"embedding\")\n",
+    ")\n",
+    "\n",
+    "# Define the index on JSON documents with key prefix \"qna:\"\n",
+    "definition = IndexDefinition(prefix=[\"qna:\"], index_type=IndexType.JSON)\n",
+    "\n",
+    "# Create the index\n",
+    "r.ft(INDEX_NAME).create_index(fields=schema, definition=definition)\n",
+    "\n",
+    "qid = \"qna:01\"\n",
+    "qa = {\n",
+    "    \"question\": \"How to block my card?\",\n",
+    "    \"answer\": \"You can block it instantly via mobile app.\",\n",
+    "    \"embedding\": list(np.random.rand(384))\n",
+    "}\n",
+    "r.execute_command(\"JSON.SET\", qid, \"$\", json.dumps(qa))\n",
+    "\n",
+    "# Semantic query\n",
+    "query_vector = np.random.rand(384).astype(np.float32).tobytes()\n",
+    "q = Query(\"*=>[KNN 1 @embedding $vec AS score]\")\\\n",
+    "    .sort_by(\"score\").return_fields(\"question\", \"answer\", \"score\").dialect(2)\n",
+    "r.ft(\"idx:qna\").search(q, query_params={\"vec\": query_vector})"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "de0d22fa-0ac7-42f7-95c7-d4eb2b5d8491",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
