@@ -84,7 +84,7 @@ Use HNSW index for fast vector retrieval and add filters like segment, status, a
 | Vector Storage  | Use `FLOAT32` with normalized vectors                             |
 | Indexing        | Use HNSW with filterable tags and range fields                    |
 | Query Precision | Tune `K`, `EF_RUNTIME`, `EF_CONSTRUCTION` in RediSearch           |
-| Data Sync       | Use RedisGears or Streams for online ingestion                    |
+| Data Sync       | Use Streams for online ingestion                    |
 | Hybrid Search   | Combine vector search with JSON filters for better targeting      |
 | Security        | Use ACLs for different microservices and enable TLS for transport |
 | Durability      | Enable append-only file (AOF) with fsync for critical workloads   |
