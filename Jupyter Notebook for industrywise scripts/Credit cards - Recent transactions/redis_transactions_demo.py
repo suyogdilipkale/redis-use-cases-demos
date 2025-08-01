@@ -12,7 +12,7 @@ import re
 def escape_tag_value(value):
     return re.sub(r'([,{}\s])', r'\\\1', value)
 # Setup
-r = redis.Redis(host='redis-19205.c330.asia-south1-1.gce.redns.redis-cloud.com', port=19205,password='admin', decode_responses=True)
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 fake = Faker()
 
 def create_index():
